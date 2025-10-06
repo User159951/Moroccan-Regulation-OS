@@ -1,0 +1,180 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    /* Institutional minimalist theme - Moroccan Regulations */
+    --background: 0 0% 98%;
+    --foreground: 220 13% 18%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 13% 18%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 13% 18%;
+
+    /* Blue professional - Primary */
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Green regulatory - Secondary */
+    --secondary: 160 84% 39%;
+    --secondary-foreground: 0 0% 100%;
+
+    /* Warm orange - Accent */
+    --accent: 20 91% 48%;
+    --accent-foreground: 0 0% 100%;
+
+    /* Modern gray - Muted */
+    --muted: 220 13% 95%;
+    --muted-foreground: 220 9% 46%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 217 91% 60%;
+
+    --radius: 0.375rem;
+
+    /* Chat specific colors */
+    --user-message: 217 91% 60%;
+    --bot-message: 220 13% 95%;
+    --reasoning: 160 84% 39%;
+    --reasoning-bg: 160 60% 97%;
+    
+    /* Reasoning frame colors */
+    --reasoning-frame-border: 217 91% 60%;
+    --reasoning-frame-bg: 217 91% 95%;
+    --reasoning-frame-text: 217 91% 20%;
+
+    /* Sidebar */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 220 13% 18%;
+    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 13% 95%;
+    --sidebar-accent-foreground: 220 13% 18%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217 91% 60%;
+
+    /* Transitions */
+    --transition-smooth: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .dark {
+    --background: 220 20% 10%;
+    --foreground: 220 13% 95%;
+
+    --card: 220 20% 12%;
+    --card-foreground: 220 13% 95%;
+
+    --popover: 220 20% 12%;
+    --popover-foreground: 220 13% 95%;
+
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 160 84% 39%;
+    --secondary-foreground: 0 0% 100%;
+
+    --accent: 20 91% 48%;
+    --accent-foreground: 0 0% 100%;
+
+    --muted: 220 20% 18%;
+    --muted-foreground: 220 13% 65%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 20% 18%;
+    --input: 220 20% 18%;
+    --ring: 217 91% 60%;
+
+    --user-message: 217 91% 60%;
+    --bot-message: 220 20% 18%;
+    --reasoning: 160 84% 39%;
+    --reasoning-bg: 160 20% 15%;
+    
+    /* Reasoning frame colors */
+    --reasoning-frame-border: 217 91% 60%;
+    --reasoning-frame-bg: 217 91% 15%;
+    --reasoning-frame-text: 217 91% 80%;
+
+    --sidebar-background: 220 20% 12%;
+    --sidebar-foreground: 220 13% 95%;
+    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 20% 18%;
+    --sidebar-accent-foreground: 220 13% 95%;
+    --sidebar-border: 220 20% 18%;
+    --sidebar-ring: 217 91% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  /* Reasoning frame styles */
+  .reasoning-frame {
+    @apply border-2 border-blue-300 bg-blue-50 rounded-lg p-4 mb-3;
+    border-color: hsl(var(--reasoning-frame-border));
+    background-color: hsl(var(--reasoning-frame-bg));
+  }
+  
+  .reasoning-frame .reasoning-title {
+    @apply text-sm font-semibold mb-2 flex items-center gap-2;
+    color: hsl(var(--reasoning-frame-text));
+  }
+  
+  .reasoning-frame .reasoning-content {
+    @apply text-sm leading-relaxed;
+    color: hsl(var(--reasoning-frame-text));
+  }
+  
+  .reasoning-content h3 {
+    @apply text-base font-semibold mb-2 mt-3;
+    color: hsl(var(--reasoning-frame-text));
+  }
+  
+  .reasoning-content h4 {
+    @apply text-sm font-semibold mb-2 mt-2;
+    color: hsl(var(--reasoning-frame-text));
+  }
+  
+  .reasoning-content ul {
+    @apply mb-2 ml-4;
+  }
+  
+  .reasoning-content li {
+    @apply mb-1 text-xs;
+  }
+  
+  .reasoning-content strong {
+    @apply font-semibold;
+    color: hsl(var(--reasoning-frame-text));
+  }
+  
+  .reasoning-content code {
+    @apply bg-blue-100 text-blue-800 px-1 py-0.5 rounded text-xs;
+  }
+  
+  .reasoning-dot {
+    @apply h-2 w-2 rounded-full animate-pulse;
+    background-color: hsl(var(--reasoning-frame-border));
+  }
+}
