@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { ChatHeader } from "@/components/ChatHeader";
 import { ChatContainer } from "@/components/ChatContainer";
 import { ChatInput } from "@/components/ChatInput";
 import { ChatFooter } from "@/components/ChatFooter";
 import { HistorySidebar } from "@/components/HistorySidebar";
+import { LeftSidebar } from "@/components/LeftSidebar";
 import { Terminal } from "@/components/Terminal";
 import { api } from "@/lib/api";
 import type { TeamType, Message, SessionInfo, WebSocketMessage } from "@/types/chat";
@@ -159,10 +160,49 @@ const Index = () => {
     );
   };
 
+  // Reset chat when changing team: clear messages and create or reuse a session
+  useEffect(() => {
+    const resetForTeam = async () => {
+      setMessages([]);
+      setCurrentReasoning("");
+      setCurrentStep("");
+
+      // Create a fresh session for the selected team
+      try {
+        const sessionResult = await api.createSession(selectedTeam);
+        setSessionId(sessionResult.session_id);
+        if (sessionResult.session_id) {
+          initializeWebSocket(sessionResult.session_id);
+        }
+      } catch (error) {
+        console.error('Erreur lors de la création de session pour équipe:', selectedTeam, error);
+      }
+    };
+
+    if (isConnected) {
+      resetForTeam();
+    }
+  }, [selectedTeam, isConnected]);
+
+  const handleNewSession = async () => {
+    try {
+      const sessionResult = await api.createSession(selectedTeam);
+      setSessionId(sessionResult.session_id);
+      setMessages([]);
+      setCurrentReasoning("");
+      setCurrentStep("");
+      initializeWebSocket(sessionResult.session_id);
+      toast({ title: "Nouvelle session", description: "Une nouvelle session a été créée." });
+      await loadSessions();
+    } catch (error) {
+      toast({ title: "Erreur", description: "Impossible de créer une nouvelle session.", variant: "destructive" });
+    }
+  };
+
   // Load sessions
   const loadSessions = async () => {
     try {
-      const data = await api.getSessions();
+      const data = await api.getSessions(selectedTeam);
       setSessions(data);
     } catch (error) {
       console.error("Failed to load sessions:", error);
@@ -342,39 +382,37 @@ const Index = () => {
     }
   };
 
+  const filteredSessions = useMemo(() => {
+    return sessions.filter((s) => (s as any).team_used === selectedTeam);
+  }, [sessions, selectedTeam]);
+
   return (
-    <div className="flex flex-col h-screen bg-background">
-      <ChatHeader
-        selectedTeam={selectedTeam}
-        onTeamChange={setSelectedTeam}
-        onHistoryClick={() => setIsHistoryOpen(true)}
-      />
+    <div className="flex h-screen bg-background">
+      <LeftSidebar selectedTeam={selectedTeam} onTeamChange={setSelectedTeam} />
+      <div className="flex-1 flex flex-col">
+        <ChatHeader
+          selectedTeam={selectedTeam}
+          onTeamChange={setSelectedTeam}
+          onHistoryClick={() => setIsHistoryOpen(true)}
+          onNewSessionClick={handleNewSession}
+        />
 
-      <ChatContainer messages={messages} isLoading={isLoading} />
+        <ChatContainer messages={messages} isLoading={isLoading} />
 
-      <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
+        <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
 
-      <ChatFooter isConnected={isConnected} currentTeam={selectedTeam} isWebSocketConnected={isWebSocketConnected} />
+        <ChatFooter isConnected={isConnected} currentTeam={selectedTeam} isWebSocketConnected={isWebSocketConnected} />
+      </div>
 
       <HistorySidebar
         isOpen={isHistoryOpen}
         onClose={() => setIsHistoryOpen(false)}
-        sessions={sessions}
+        sessions={filteredSessions}
         currentSessionId={sessionId}
         onSelectSession={handleSelectSession}
         onDeleteSession={handleDeleteSession}
         onExportSession={handleExportSession}
       />
-
-      {/* Terminal masqué - les étapes s'affichent dans le chat */}
-      {/* <Terminal 
-        isVisible={isTerminalVisible}
-        content={terminalContent}
-        isActive={isTerminalActive}
-        currentStep={currentStep}
-        stepNumber={stepNumber}
-        totalSteps={totalSteps}
-      /> */}
     </div>
   );
 };

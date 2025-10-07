@@ -8,14 +8,7 @@ interface ChatFooterProps {
 }
 
 export function ChatFooter({ isConnected, currentTeam, isWebSocketConnected = false }: ChatFooterProps) {
-  const getTeamLabel = (team: TeamType) => {
-    const labels: Record<TeamType, string> = {
-      global: "Global (ACAPS + AMMC)",
-      acaps: "ACAPS uniquement",
-      ammc: "AMMC uniquement",
-    };
-    return labels[team];
-  };
+  // Removed active team label per request
 
   return (
     <footer className="border-t bg-card">
@@ -40,9 +33,7 @@ export function ChatFooter({ isConnected, currentTeam, isWebSocketConnected = fa
             )}
           </div>
 
-          <div className="text-muted-foreground">
-            Équipe active: <span className="font-medium">{getTeamLabel(currentTeam)}</span>
-          </div>
+          <div />
         </div>
       </div>
     </footer>

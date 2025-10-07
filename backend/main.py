@@ -94,10 +94,144 @@ def clean_agent_output(content: str) -> str:
     
     cleaned = re.sub(r'^(#{1,6})\s*(.*?)$', replace_heading, cleaned, flags=re.MULTILINE)
     
-    # Fix bullet points and lists
-    cleaned = re.sub(r'^[-*+]\s+(.*?)$', r'<li class="mb-2 ml-4 list-disc">\1</li>', cleaned, flags=re.MULTILINE)
-    cleaned = re.sub(r'^\d+\.\s+(.*?)$', r'<li class="mb-2 ml-4 list-decimal">\1</li>', cleaned, flags=re.MULTILINE)
-    cleaned = re.sub(r'(<li[^>]*>.*?</li>)', r'<ul class="mb-4 ml-4 list-disc space-y-1">\1</ul>', cleaned)
+    # Fix professional document sections
+    def format_professional_sections(content):
+        # Pattern pour les sections professionnelles (titre en gras suivi de contenu)
+        section_pattern = r'^([A-Z][^:]+:)\s*(.*?)(?=^[A-Z][^:]+:|$)'
+        
+        def replace_section(match):
+            title = match.group(1).strip()
+            content_text = match.group(2).strip()
+            
+            # Mapping des titres vers des classes CSS
+            title_classes = {
+                "Contexte Opérationnel et Impact sur les Activités Bancaires:": "bg-blue-50 border-blue-200 text-blue-900",
+                "Procédures, Délais et Documents Requis:": "bg-green-50 border-green-200 text-green-900",
+                "Sanctions en Cas de Non-Conformité:": "bg-red-50 border-red-200 text-red-900",
+                "Références Réglementaires Utilisées:": "bg-yellow-50 border-yellow-200 text-yellow-900",
+                "Références réglementaires exactes:": "bg-yellow-50 border-yellow-200 text-yellow-900"
+            }
+            
+            classes = title_classes.get(title, "bg-gray-50 border-gray-200 text-gray-900")
+            
+            return f'''
+            <div class="border-l-4 {classes} p-4 mb-6 rounded-r-lg">
+                <h3 class="text-lg font-semibold mb-3">{title}</h3>
+                <div class="text-gray-800 leading-relaxed">
+                    {content_text}
+                </div>
+            </div>
+            '''
+        
+        # Appliquer le formatage aux sections
+        content = re.sub(section_pattern, replace_section, content, flags=re.MULTILINE | re.DOTALL)
+        return content
+    
+    # Apply professional sections formatting
+    cleaned = format_professional_sections(cleaned)
+    
+    # Fix emoji sections (📘, ⚙️, 🚨, 📊, 🧩, 📚)
+    def replace_emoji_section(match):
+        emoji = match.group(1)
+        title = match.group(2).strip()
+        content = match.group(3).strip()
+        
+        # Mapping des emojis vers des classes CSS
+        emoji_classes = {
+            "📘": "bg-blue-50 border-blue-200 text-blue-900",
+            "⚙️": "bg-gray-50 border-gray-200 text-gray-900", 
+            "🚨": "bg-red-50 border-red-200 text-red-900",
+            "📊": "bg-green-50 border-green-200 text-green-900",
+            "🧩": "bg-purple-50 border-purple-200 text-purple-900",
+            "📚": "bg-yellow-50 border-yellow-200 text-yellow-900"
+        }
+        
+        classes = emoji_classes.get(emoji, "bg-gray-50 border-gray-200 text-gray-900")
+        
+        return f'''
+        <div class="border-l-4 {classes} p-4 mb-6 rounded-r-lg">
+            <h3 class="text-lg font-semibold mb-3 flex items-center">
+                <span class="text-2xl mr-3">{emoji}</span>
+                {title}
+            </h3>
+            <div class="text-gray-800 leading-relaxed">
+                {content}
+            </div>
+        </div>
+        '''
+    
+    # Pattern pour capturer les sections avec emojis
+    emoji_pattern = r'(📘|⚙️|🚨|📊|🧩|📚)\s*([^:]+):\s*(.*?)(?=(?:📘|⚙️|🚨|📊|🧩|📚)\s*[^:]+:|$)'
+    cleaned = re.sub(emoji_pattern, replace_emoji_section, cleaned, flags=re.DOTALL)
+    
+    # Fix bullet points and lists - improved handling
+    def fix_lists_in_content(content):
+        # Fix bullet points
+        content = re.sub(r'^[-*+]\s+(.*?)$', r'<li class="mb-2 ml-4 list-disc">\1</li>', content, flags=re.MULTILINE)
+        # Fix numbered lists
+        content = re.sub(r'^\d+\.\s+(.*?)$', r'<li class="mb-2 ml-4 list-decimal">\1</li>', content, flags=re.MULTILINE)
+        
+        # Group consecutive list items
+        content = re.sub(r'(<li[^>]*>.*?</li>(?:\s*<li[^>]*>.*?</li>)*)', 
+                        lambda m: f'<ul class="mb-4 ml-4 list-disc space-y-1">{m.group(1)}</ul>', 
+                        content, flags=re.DOTALL)
+        
+        return content
+    
+    # Apply list fixing to the cleaned content
+    cleaned = fix_lists_in_content(cleaned)
+    
+    # Fix regulatory references formatting
+    def format_regulatory_references(content):
+        # Pattern pour capturer les références réglementaires avec extraits
+        ref_pattern = r'(\*\*Document :\*\*.*?)(?=\*\*Document :\*\*|$)'
+        
+        def format_single_reference(match):
+            ref_content = match.group(1).strip()
+            
+            # Extraire les éléments
+            doc_match = re.search(r'\*\*Document :\*\*\s*(.*?)(?=\*\*|$)', ref_content)
+            article_match = re.search(r'\*\*Article :\*\*\s*(.*?)(?=\*\*|$)', ref_content)
+            extract_match = re.search(r'\*\*Extrait cité :\*\*\s*["\'](.*?)["\']', ref_content)
+            date_match = re.search(r'\*\*Date :\*\*\s*(.*?)(?=\*\*|$)', ref_content)
+            
+            if not doc_match:
+                return ref_content  # Return as-is if not properly formatted
+            
+            doc_name = doc_match.group(1).strip()
+            article = article_match.group(1).strip() if article_match else "Non spécifié"
+            extract = extract_match.group(1).strip() if extract_match else "Extrait non disponible"
+            date = date_match.group(1).strip() if date_match else "Date non spécifiée"
+            
+            return f'''
+            <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4 rounded-r-lg">
+                <div class="flex items-start space-x-3">
+                    <div class="flex-shrink-0">
+                        <span class="text-yellow-600 text-lg">📚</span>
+                    </div>
+                    <div class="flex-1">
+                        <h4 class="font-semibold text-yellow-900 mb-2">{doc_name}</h4>
+                        <div class="space-y-2 text-sm">
+                            <div><span class="font-medium text-yellow-800">Article :</span> <span class="text-yellow-700">{article}</span></div>
+                            <div><span class="font-medium text-yellow-800">Date :</span> <span class="text-yellow-700">{date}</span></div>
+                            <div class="mt-3">
+                                <span class="font-medium text-yellow-800">Extrait cité :</span>
+                                <blockquote class="mt-2 p-3 bg-yellow-100 border-l-2 border-yellow-300 italic text-yellow-800">
+                                    "{extract}"
+                                </blockquote>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            '''
+        
+        # Appliquer le formatage aux références
+        content = re.sub(ref_pattern, format_single_reference, content, flags=re.DOTALL)
+        return content
+    
+    # Apply regulatory references formatting
+    cleaned = format_regulatory_references(cleaned)
     
     # Fix bold and italic
     cleaned = re.sub(r'\*\*(.*?)\*\*', r'<strong class="font-semibold text-gray-900">\1</strong>', cleaned)
@@ -144,6 +278,7 @@ try:
         TeamGlobal,
         ACAPSSpecialiste,
         AMMCSpecialiste,
+        SeniorTradeManager,
         TEAMS
     )
     debug_log("SYSTEM STARTUP - Modules imported successfully")
@@ -165,6 +300,11 @@ try:
         "agent_initialized": AMMCSpecialiste is not None
     })
     
+    debug_log("AGENT INIT - Senior Trade Manager initialized", {
+        "agent_type": type(SeniorTradeManager).__name__,
+        "agent_initialized": SeniorTradeManager is not None
+    })
+    
     debug_log("SYSTEM STARTUP - All Régulation Marocaine agents initialized successfully! 🎉")
     
 except Exception as e:
@@ -175,6 +315,7 @@ except Exception as e:
     TeamGlobal = None
     ACAPSSpecialiste = None
     AMMCSpecialiste = None
+    SeniorTradeManager = None
     TEAMS = {}
 
 # Stockage en mémoire des sessions
@@ -306,6 +447,108 @@ def update_session(session_id: str, message: str, response: str, reasoning: str,
         sessions[session_id]["last_activity"] = datetime.now().isoformat()
         sessions[session_id]["team_used"] = team
 
+def orchestrate_global_to_trade_manager_workflow(user_input: str):
+    """
+    Orchestre le workflow : User Input → TeamGlobal → SeniorTradeManager → Output final
+    """
+    debug_log("WORKFLOW START - Orchestrating Global → Trade Manager workflow", {
+        "user_input": user_input[:200] + "..." if len(user_input) > 200 else user_input
+    })
+    
+    try:
+        # Étape 1: TeamGlobal analyse la question
+        debug_log("WORKFLOW STEP 1 - TeamGlobal processing...")
+        global_output = TeamGlobal.run(user_input)
+        global_content = global_output.content if hasattr(global_output, 'content') else str(global_output)
+        global_reasoning = global_output.reasoning_content if hasattr(global_output, 'reasoning_content') else ""
+        
+        debug_log("WORKFLOW STEP 1 COMPLETE - TeamGlobal output", {
+            "content_length": len(global_content),
+            "reasoning_length": len(global_reasoning),
+            "content_preview": global_content[:300] + "..." if len(global_content) > 300 else global_content,
+            "full_content": global_content,  # Log complet pour debug
+            "has_references": "Références réglementaires" in global_content,
+            "references_section": global_content.split("Références réglementaires")[-1][:500] if "Références réglementaires" in global_content else "Aucune référence trouvée"
+        })
+        
+        # Étape 2: SeniorTradeManager transforme l'output de TeamGlobal
+        debug_log("WORKFLOW STEP 2 - SeniorTradeManager processing...")
+        
+        # Créer le prompt pour SeniorTradeManager pour réécrire l'output de TeamGlobal
+        trade_manager_prompt = f"""
+        **QUESTION ORIGINALE DE L'UTILISATEUR :**
+        {user_input}
+
+        **ANALYSE RÉGLEMENTAIRE FOURNIE PAR L'ÉQUIPE ACAPS & AMMC :**
+        {global_content}
+
+        **VOTRE MISSION :**
+        En tant que Senior Trade Manager d'une banque marocaine, réécrivez cette analyse réglementaire de manière très métier et professionnelle.
+
+        **VOTRE APPROCHE :**
+        - Transformez le langage technique en langage professionnel bancaire
+        - Adaptez le contenu aux préoccupations d'un Senior Trade Manager
+        - Maintenez la rigueur des références réglementaires
+        - Rendez l'information directement utilisable en opérations
+
+        **RÈGLES DE RÉÉCRITURE :**
+        - Utilisez un français professionnel bancaire
+        - Précisez les implications opérationnelles concrètes
+        - Mentionnez les procédures, délais et documents requis
+        - Indiquez les sanctions en cas de non-conformité
+        - **CONSERVEZ TOUTES LES RÉFÉRENCES RÉGLEMENTAIRES** de l'analyse originale
+        - **RÉÉCRIVEZ les références** dans le format standard :
+          * **Document :** [Nom exact du document]
+          * **Article :** [Numéro d'article/paragraphe]
+          * **Extrait cité :** "[Texte exact entre guillemets]"
+          * **Date :** [Date de publication]
+        - Adaptez le niveau de détail selon la complexité du sujet
+        - Ne pas inventer de réglementations ou donner d'avis juridiques contraignants
+
+        **OBJECTIF :** Produire une version professionnelle et métier de cette analyse réglementaire, adaptée aux besoins d'un Senior Trade Manager.
+        """
+        
+        trade_manager_output = SeniorTradeManager.run(trade_manager_prompt)
+        final_content = trade_manager_output.content if hasattr(trade_manager_output, 'content') else str(trade_manager_output)
+        final_reasoning = trade_manager_output.reasoning_content if hasattr(trade_manager_output, 'reasoning_content') else ""
+        
+        debug_log("WORKFLOW STEP 2 COMPLETE - SeniorTradeManager output", {
+            "content_length": len(final_content),
+            "reasoning_length": len(final_reasoning),
+            "content_preview": final_content[:300] + "..." if len(final_content) > 300 else final_content
+        })
+        
+        # Combiner les reasoning des deux agents
+        combined_reasoning = f"""
+        **Étape 1 - Analyse réglementaire (Team Global):**
+        {global_reasoning if global_reasoning else "Raisonnement non disponible"}
+        
+        **Étape 2 - Transformation business (Senior Trade Manager):**
+        {final_reasoning if final_reasoning else "Raisonnement non disponible"}
+        """
+        
+        debug_log("WORKFLOW COMPLETE - Final output ready", {
+            "final_content_length": len(final_content),
+            "combined_reasoning_length": len(combined_reasoning)
+        })
+        
+        return {
+            "content": final_content,
+            "reasoning": combined_reasoning,
+            "workflow_completed": True
+        }
+        
+    except Exception as e:
+        debug_log("WORKFLOW ERROR - Orchestration failed", {
+            "error_type": type(e).__name__,
+            "error_message": str(e)
+        })
+        return {
+            "content": f"Erreur dans le workflow: {str(e)}",
+            "reasoning": "Erreur lors de l'orchestration des agents",
+            "workflow_completed": False
+        }
+
 # Routes
 @app.get("/")
 def root():
@@ -380,50 +623,35 @@ async def send_message(chat_message: ChatMessage):
     session_id = get_or_create_session(chat_message.session_id)
     
     try:
-        # Sélectionner l'agent approprié
-        agent = TEAMS.get(chat_message.team, TeamGlobal)
+        # Utiliser le workflow orchestré : TeamGlobal → SeniorTradeManager
+        debug_log("PROCESSING REQUEST - Using orchestrated workflow", {
+            "team": chat_message.team,
+            "workflow": "TeamGlobal → SeniorTradeManager"
+        })
         
-        if not agent:
-            debug_log("ERROR: Agent not initialized", {"team": chat_message.team})
+        # Orchestrer le workflow
+        workflow_result = orchestrate_global_to_trade_manager_workflow(chat_message.message)
+        
+        if not workflow_result["workflow_completed"]:
+            debug_log("WORKFLOW FAILED - Using fallback", {
+                "error": workflow_result["content"]
+            })
             return ChatResponse(
                 session_id=session_id,
-                response="Erreur: Agent non initialisé",
-                reasoning="Agent non disponible",
+                response=workflow_result["content"],
+                reasoning=workflow_result["reasoning"],
+                timestamp=datetime.now().isoformat(),
                 team_used=chat_message.team
             )
         
-        debug_log("PROCESSING REQUEST - Sending to agent...", {
-            "agent_type": type(agent).__name__,
-            "team": chat_message.team
-        })
-        
-        # Obtenir la réponse de l'agent
-        output = agent.run(chat_message.message)
-        
-        # Extraire le contenu principal
-        raw_content = output.content if hasattr(output, 'content') else str(output)
-        debug_log("RAW AGENT OUTPUT", {
-            "output_type": type(output).__name__,
-            "raw_content": raw_content[:500] + "..." if len(raw_content) > 500 else raw_content
-        })
-        
-        # Extraire le reasoning_content si disponible (basé sur l'image)
-        reasoning = "Raisonnement non disponible"
-        if hasattr(output, "reasoning_content") and output.reasoning_content:
-            debug_log("REASONING CONTENT FOUND", {
-                "length": len(output.reasoning_content),
-                "preview": output.reasoning_content[:200] + "..." if len(output.reasoning_content) > 200 else output.reasoning_content
-            })
-            reasoning = output.reasoning_content
-        else:
-            debug_log("REASONING CONTENT NOT FOUND", {
-                "has_reasoning_content": hasattr(output, "reasoning_content"),
-                "available_attrs": [attr for attr in dir(output) if not attr.startswith('_')]
-            })
-        
         # Nettoyer le contenu pour l'affichage
-        cleaned_response = clean_agent_output(raw_content)
-        cleaned_reasoning = clean_agent_output(reasoning) if reasoning != "Raisonnement non disponible" else reasoning
+        cleaned_response = clean_agent_output(workflow_result["content"])
+        cleaned_reasoning = clean_agent_output(workflow_result["reasoning"])
+        
+        debug_log("WORKFLOW SUCCESS - Final response ready", {
+            "response_length": len(cleaned_response),
+            "reasoning_length": len(cleaned_reasoning)
+        })
         
         # Mettre à jour la session
         update_session(session_id, chat_message.message, cleaned_response, cleaned_reasoning, chat_message.team)
@@ -502,97 +730,77 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                 # Ne plus envoyer de logs génériques du terminal
                 # Le terminal affichera uniquement les reasoning steps
                 
-                # Obtenir l'agent approprié
-                agent = TEAMS.get(team, TeamGlobal)
+                # Utiliser le workflow orchestré : TeamGlobal → SeniorTradeManager
+                debug_log("WEBSOCKET WORKFLOW - Using orchestrated workflow", {
+                    "team": team,
+                    "workflow": "TeamGlobal → SeniorTradeManager"
+                })
                 
-                if agent:
-                    # Obtenir la réponse de l'agent
-                    output = agent.run(message)
-                    raw_content = output.content if hasattr(output, 'content') else str(output)
-                    
-                    # Extraire le reasoning_content si disponible (basé sur l'image)
-                    reasoning_content = ""
-                    if hasattr(output, "reasoning_content") and output.reasoning_content:
-                        debug_log("WEBSOCKET REASONING CONTENT FOUND", {
-                            "length": len(output.reasoning_content),
-                            "preview": output.reasoning_content[:200] + "..." if len(output.reasoning_content) > 200 else output.reasoning_content
-                        })
-                        reasoning_content = output.reasoning_content
-                        
-                        # Diviser en étapes pour le streaming
-                        reasoning_steps = split_reasoning_into_steps(reasoning_content)
-                        
-                        if reasoning_steps:
-                            # Streamer les vraies étapes de raisonnement UNE PAR UNE
-                            for i, step in enumerate(reasoning_steps):
-                                await websocket.send_text(json.dumps({
-                                    "type": "reasoning_step",
-                                    "step": step,  # Utiliser directement le contenu de l'agent
-                                    "step_number": i + 1,
-                                    "total_steps": len(reasoning_steps),
-                                    "timestamp": datetime.now().isoformat()
-                                }))
-                                # Pause pour laisser le temps de lire cette étape
-                                import asyncio
-                                await asyncio.sleep(10.0)  # 10 secondes pour lire chaque étape
-                        else:
-                            # Si pas d'étapes détectées, envoyer le contenu complet
-                            await websocket.send_text(json.dumps({
-                                "type": "reasoning_step",
-                                "step": "Raisonnement: " + reasoning_content[:500] + ("..." if len(reasoning_content) > 500 else ""),
-                                "timestamp": datetime.now().isoformat()
-                            }))
-                    else:
-                        debug_log("WEBSOCKET REASONING CONTENT NOT FOUND", {
-                            "has_reasoning_content": hasattr(output, "reasoning_content")
-                        })
-                        # Fallback: étapes génériques si pas de reasoning_content
-                        reasoning_steps = [
-                            "Analyse de la question utilisateur",
-                            "Recherche d'informations pertinentes", 
-                            "Formulation de la réponse",
-                            "Vérification de la cohérence"
-                        ]
-                        
-                        for i, step in enumerate(reasoning_steps):
-                            await websocket.send_text(json.dumps({
-                                "type": "reasoning_step",
-                                "step": step,  # Utiliser directement le contenu de l'agent
-                                "step_number": i + 1,
-                                "total_steps": len(reasoning_steps),
-                                "timestamp": datetime.now().isoformat()
-                            }))
-                            # Pause pour laisser le temps de lire cette étape
-                            import asyncio
-                            await asyncio.sleep(10.0)  # 10 secondes pour lire chaque étape
-                        
-                        reasoning_content = "\n\n".join([f"Étape {i+1}: {step}" for i, step in enumerate(reasoning_steps)])
-                    
-                    # Nettoyer les contenus
-                    cleaned_response = clean_agent_output(raw_content)
-                    cleaned_reasoning = clean_agent_output(reasoning_content) if reasoning_content else "Raisonnement non disponible"
-                    
-                    # Délai très long avant l'envoi de la réponse finale pour laisser le temps de voir les étapes
-                    import asyncio
-                    await asyncio.sleep(15.0)
-                    
-                    # Envoyer la réponse finale (sans reasoning pour éviter la duplication)
-                    await websocket.send_text(json.dumps({
-                        "type": "response",
-                        "response": cleaned_response,
-                        "reasoning": "",  # Pas de reasoning dans la réponse finale
-                        "team_used": team,
-                        "timestamp": datetime.now().isoformat()
-                    }))
-                    
-                    # Mettre à jour la session
-                    update_session(session_id, message, cleaned_response, cleaned_reasoning, team)
-                else:
+                # Orchestrer le workflow
+                workflow_result = orchestrate_global_to_trade_manager_workflow(message)
+                
+                if not workflow_result["workflow_completed"]:
                     await websocket.send_text(json.dumps({
                         "type": "error",
-                        "message": "Agent non disponible",
+                        "message": workflow_result["content"],
                         "timestamp": datetime.now().isoformat()
                     }))
+                    return
+                
+                # Diviser le reasoning en étapes pour le streaming
+                reasoning_steps = split_reasoning_into_steps(workflow_result["reasoning"])
+                        
+                if reasoning_steps:
+                    # Streamer les étapes de raisonnement
+                    for i, step in enumerate(reasoning_steps):
+                        await websocket.send_text(json.dumps({
+                            "type": "reasoning_step",
+                            "step": step,
+                            "step_number": i + 1,
+                            "total_steps": len(reasoning_steps),
+                            "timestamp": datetime.now().isoformat()
+                        }))
+                        # Pause pour laisser le temps de lire cette étape
+                        import asyncio
+                        await asyncio.sleep(8.0)  # 8 secondes pour lire chaque étape
+                else:
+                    # Fallback: étapes génériques du workflow
+                    workflow_steps = [
+                        "Étape 1: Analyse réglementaire par Team Global",
+                        "Étape 2: Transformation en insights business par Senior Trade Manager",
+                        "Étape 3: Finalisation de la réponse structurée"
+                    ]
+                    
+                    for i, step in enumerate(workflow_steps):
+                        await websocket.send_text(json.dumps({
+                            "type": "reasoning_step",
+                            "step": step,
+                            "step_number": i + 1,
+                            "total_steps": len(workflow_steps),
+                            "timestamp": datetime.now().isoformat()
+                        }))
+                        import asyncio
+                        await asyncio.sleep(8.0)
+                
+                # Nettoyer le contenu pour l'affichage
+                cleaned_response = clean_agent_output(workflow_result["content"])
+                cleaned_reasoning = clean_agent_output(workflow_result["reasoning"])
+                
+                # Délai avant l'envoi de la réponse finale
+                import asyncio
+                await asyncio.sleep(10.0)
+                    
+                # Envoyer la réponse finale
+                await websocket.send_text(json.dumps({
+                    "type": "response",
+                    "response": cleaned_response,
+                    "reasoning": "",  # Pas de reasoning dans la réponse finale
+                    "team_used": team,
+                    "timestamp": datetime.now().isoformat()
+                }))
+                
+                # Mettre à jour la session
+                update_session(session_id, message, cleaned_response, cleaned_reasoning, team)
                 
             except json.JSONDecodeError:
                 await websocket.send_text(json.dumps({

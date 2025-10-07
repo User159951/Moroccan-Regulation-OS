@@ -1,4 +1,4 @@
-import type { ChatMessage, ChatResponse, SessionInfo, WebSocketMessage } from "@/types/chat";
+import type { ChatMessage, ChatResponse, SessionInfo, WebSocketMessage, TeamType } from "@/types/chat";
 
 const API_BASE = "http://localhost:8000";
 
@@ -13,8 +13,9 @@ export const api = {
     return response.json();
   },
 
-  async getSessions(): Promise<SessionInfo[]> {
-    const response = await fetch(`${API_BASE}/sessions`);
+  async getSessions(team?: TeamType): Promise<SessionInfo[]> {
+    const url = team ? `${API_BASE}/sessions?team=${encodeURIComponent(team)}` : `${API_BASE}/sessions`;
+    const response = await fetch(url);
     if (!response.ok) throw new Error("Failed to fetch sessions");
     return response.json();
   },
@@ -50,10 +51,11 @@ export const api = {
     return response.json();
   },
 
-  async createSession(): Promise<{ session_id: string }> {
+  async createSession(team?: TeamType): Promise<{ session_id: string }> {
     const response = await fetch(`${API_BASE}/sessions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      body: team ? JSON.stringify({ team }) : undefined,
     });
     if (!response.ok) throw new Error("Failed to create session");
     return response.json();
